@@ -3,7 +3,7 @@ import { Pool } from 'pg';
 
 export async function GET() {
   try {
-    const connectionString = process.env.POSTGRES_URL?.replace(/[?&]sslmode=[^&]+/, '');
+    const connectionString = process.env.POSTGRES_URL?.split('?')[0];
     const pool = new Pool({
       connectionString,
       ssl: { rejectUnauthorized: false }
