@@ -1,15 +1,9 @@
 import { Pool } from 'pg';
 
-// Initialize connection pool with individual parameters for better SSL control
+// Initialize connection pool
+// Use Vercel Postgres connection string which works out of the box
 const pool = new Pool({
-  host: process.env.POSTGRES_HOST,
-  database: process.env.POSTGRES_DATABASE,
-  user: process.env.POSTGRES_USER,
-  password: process.env.POSTGRES_PASSWORD,
-  port: 5432,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  connectionString: process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL,
 });
 
 export interface Print {
