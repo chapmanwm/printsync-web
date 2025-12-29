@@ -1,4 +1,9 @@
-import { sql } from '@vercel/postgres';
+import { Pool } from 'pg';
+
+// Initialize connection pool
+const pool = new Pool({
+  connectionString: process.env.POSTGRES_URL,
+});
 
 export interface Print {
   id: string;
@@ -26,7 +31,7 @@ export interface Print {
 }
 
 export async function initDb() {
-  await sql`
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS prints (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
@@ -51,16 +56,16 @@ export async function initDb() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
-  `;
+  `);
 
-  // Create index for efficient queries
-  await sql`CREATE INDEX IF NOT EXISTS idx_claimed_by ON prints(claimed_by)`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_created_at ON prints(created_at DESC)`;
+  // Create indexes for efficient queries
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_claimed_by ON prints(claimed_by)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_created_at ON prints(created_at DESC)`);
 }
 
 export async function upsertPrint(print: Omit<Print, 'created_at' | 'updated_at'>) {
-  const result = await sql`
-    INSERT INTO prints (
+  const result = await pool.query(
+    `INSERT INTO prints (
       id, title, cover, status, start_time, end_time, total_weight,
       filament_1_material, filament_1_colour, filament_1_weight,
       filament_2_material, filament_2_colour, filament_2_weight,
@@ -68,15 +73,7 @@ export async function upsertPrint(print: Omit<Print, 'created_at' | 'updated_at'
       filament_4_material, filament_4_colour, filament_4_weight,
       claimed_by
     )
-    VALUES (
-      ${print.id}, ${print.title}, ${print.cover}, ${print.status},
-      ${print.start_time}, ${print.end_time}, ${print.total_weight},
-      ${print.filament_1_material}, ${print.filament_1_colour}, ${print.filament_1_weight},
-      ${print.filament_2_material}, ${print.filament_2_colour}, ${print.filament_2_weight},
-      ${print.filament_3_material}, ${print.filament_3_colour}, ${print.filament_3_weight},
-      ${print.filament_4_material}, ${print.filament_4_colour}, ${print.filament_4_weight},
-      ${print.claimed_by}
-    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
     ON CONFLICT (id) DO UPDATE SET
       title = EXCLUDED.title,
       cover = EXCLUDED.cover,
@@ -90,58 +87,64 @@ export async function upsertPrint(print: Omit<Print, 'created_at' | 'updated_at'
       filament_2_material = EXCLUDED.filament_2_material,
       filament_2_colour = EXCLUDED.filament_2_colour,
       filament_2_weight = EXCLUDED.filament_2_weight,
-      filament_3_material = EXCLUDED.filament_3_material,
+      filament_3_material = EXCLUDED.filament_3_colour,
       filament_3_colour = EXCLUDED.filament_3_colour,
       filament_3_weight = EXCLUDED.filament_3_weight,
       filament_4_material = EXCLUDED.filament_4_material,
       filament_4_colour = EXCLUDED.filament_4_colour,
       filament_4_weight = EXCLUDED.filament_4_weight,
       updated_at = CURRENT_TIMESTAMP
-    WHERE prints.claimed_by IS NULL
-  `;
+    WHERE prints.claimed_by IS NULL`,
+    [
+      print.id, print.title, print.cover, print.status,
+      print.start_time, print.end_time, print.total_weight,
+      print.filament_1_material, print.filament_1_colour, print.filament_1_weight,
+      print.filament_2_material, print.filament_2_colour, print.filament_2_weight,
+      print.filament_3_material, print.filament_3_colour, print.filament_3_weight,
+      print.filament_4_material, print.filament_4_colour, print.filament_4_weight,
+      print.claimed_by,
+    ]
+  );
 
   return result;
 }
 
 export async function getPrints(filter?: { claimed?: boolean }) {
+  let query = 'SELECT * FROM prints';
+  const params: any[] = [];
+
   if (filter?.claimed === false) {
-    return await sql<Print>`
-      SELECT * FROM prints
-      WHERE claimed_by IS NULL
-      ORDER BY created_at DESC
-    `;
+    query += ' WHERE claimed_by IS NULL';
   } else if (filter?.claimed === true) {
-    return await sql<Print>`
-      SELECT * FROM prints
-      WHERE claimed_by IS NOT NULL
-      ORDER BY created_at DESC
-    `;
+    query += ' WHERE claimed_by IS NOT NULL';
   }
 
-  return await sql<Print>`
-    SELECT * FROM prints
-    ORDER BY created_at DESC
-  `;
+  query += ' ORDER BY created_at DESC';
+
+  const result = await pool.query(query, params);
+  return result;
 }
 
 export async function claimPrint(id: string, user: string) {
-  const result = await sql`
-    UPDATE prints
-    SET claimed_by = ${user}, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ${id} AND claimed_by IS NULL
-    RETURNING *
-  `;
+  const result = await pool.query(
+    `UPDATE prints
+     SET claimed_by = $1, updated_at = CURRENT_TIMESTAMP
+     WHERE id = $2 AND claimed_by IS NULL
+     RETURNING *`,
+    [user, id]
+  );
 
   return result.rows[0] || null;
 }
 
 export async function unclaimPrint(id: string) {
-  const result = await sql`
-    UPDATE prints
-    SET claimed_by = NULL, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ${id}
-    RETURNING *
-  `;
+  const result = await pool.query(
+    `UPDATE prints
+     SET claimed_by = NULL, updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1
+     RETURNING *`,
+    [id]
+  );
 
   return result.rows[0] || null;
 }

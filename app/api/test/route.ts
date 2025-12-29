@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import { sql } from '@vercel/postgres';
+import { Pool } from 'pg';
 
 export async function GET() {
   try {
-    const result = await sql`SELECT 1 as test`;
+    const pool = new Pool({ connectionString: process.env.POSTGRES_URL });
+    const result = await pool.query('SELECT 1 as test');
+    await pool.end();
+
     return NextResponse.json({
       hasApiSecret: !!process.env.API_SECRET,
       secretLength: process.env.API_SECRET?.length || 0,
