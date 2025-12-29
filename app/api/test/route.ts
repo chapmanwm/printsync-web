@@ -4,7 +4,11 @@ import { Pool } from 'pg';
 export async function GET() {
   try {
     const pool = new Pool({
-      connectionString: process.env.POSTGRES_URL,
+      host: process.env.POSTGRES_HOST,
+      database: process.env.POSTGRES_DATABASE,
+      user: process.env.POSTGRES_USER,
+      password: process.env.POSTGRES_PASSWORD,
+      port: 5432,
       ssl: { rejectUnauthorized: false }
     });
     const result = await pool.query('SELECT 1 as test');
