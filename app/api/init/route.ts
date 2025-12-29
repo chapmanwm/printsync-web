@@ -11,8 +11,12 @@ export async function GET(request: NextRequest) {
 
     await initDb();
     return NextResponse.json({ success: true, message: 'Database initialized' });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error initializing database:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({
+      error: 'Internal server error',
+      details: error.message,
+      stack: error.stack
+    }, { status: 500 });
   }
 }
