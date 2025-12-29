@@ -3,6 +3,9 @@ import { Pool } from 'pg';
 // Initialize connection pool for Supabase
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 export interface Print {
