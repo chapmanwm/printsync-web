@@ -1,8 +1,11 @@
 import { Pool } from 'pg';
 
 // Initialize connection pool for Supabase
+// Remove sslmode parameter from connection string and handle SSL separately
+const connectionString = process.env.POSTGRES_URL?.replace(/[?&]sslmode=[^&]+/, '');
+
 const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL,
+  connectionString,
   ssl: {
     rejectUnauthorized: false
   }
