@@ -88,7 +88,7 @@ export async function upsertPrint(print: Omit<Print, 'created_at' | 'updated_at'
       end_time = EXCLUDED.end_time,
       total_weight = EXCLUDED.total_weight,
       filament_1_material = EXCLUDED.filament_1_material,
-      filament_1_colour = EXCLUDED.filament_1_weight,
+      filament_1_colour = EXCLUDED.filament_1_colour,
       filament_1_weight = EXCLUDED.filament_1_weight,
       filament_2_material = EXCLUDED.filament_2_material,
       filament_2_colour = EXCLUDED.filament_2_colour,
@@ -99,8 +99,8 @@ export async function upsertPrint(print: Omit<Print, 'created_at' | 'updated_at'
       filament_4_material = EXCLUDED.filament_4_material,
       filament_4_colour = EXCLUDED.filament_4_colour,
       filament_4_weight = EXCLUDED.filament_4_weight,
-      updated_at = CURRENT_TIMESTAMP
-    WHERE prints.claimed_by IS NULL`,
+      claimed_by = COALESCE(prints.claimed_by, EXCLUDED.claimed_by),
+      updated_at = CURRENT_TIMESTAMP`,
     [
       print.id, print.title, print.cover, print.status,
       print.start_time, print.end_time, print.total_weight,
