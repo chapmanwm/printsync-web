@@ -150,9 +150,34 @@ function hexToRgb(hex: string): string {
 
 export default function Home() {
   const [prints, setPrints] = useState<Print[]>([]);
+  const [allPrints, setAllPrints] = useState<Print[]>([]); // For accurate counts
   const [filter, setFilter] = useState<'unclaimed' | 'all' | 'claimed'>('unclaimed');
   const [loading, setLoading] = useState(true);
   const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set());
+
+  // Sort prints by end_time or created_at, newest first
+  const sortPrints = (data: Print[]) => {
+    return [...data].sort((a, b) => {
+      const dateA = new Date(a.end_time || a.created_at).getTime();
+      const dateB = new Date(b.end_time || b.created_at).getTime();
+      return dateB - dateA; // Descending (newest first)
+    });
+  };
+
+  // Fetch all prints once on mount for accurate counts
+  const fetchAllPrints = async () => {
+    if (USE_MOCK_DATA) {
+      setAllPrints(mockPrints);
+      return;
+    }
+    try {
+      const res = await fetch('/api/prints');
+      const data = await res.json();
+      setAllPrints(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching all prints:', error);
+    }
+  };
 
   const fetchPrints = async () => {
     setLoading(true);
@@ -164,14 +189,19 @@ export default function Home() {
         } else if (filter === 'unclaimed') {
           filteredPrints = mockPrints.filter(p => p.claimed_by === null);
         }
-        setPrints(filteredPrints);
+        setPrints(sortPrints(filteredPrints));
       } else {
         const url = filter === 'all'
           ? '/api/prints'
           : `/api/prints?claimed=${filter === 'claimed'}`;
         const res = await fetch(url);
         const data = await res.json();
-        setPrints(Array.isArray(data) ? data : []);
+        const printsData = Array.isArray(data) ? data : [];
+        setPrints(sortPrints(printsData));
+        // Update allPrints when fetching 'all' to keep counts fresh
+        if (filter === 'all') {
+          setAllPrints(printsData);
+        }
       }
     } catch (error) {
       console.error('Error fetching prints:', error);
@@ -181,6 +211,11 @@ export default function Home() {
     }
   };
 
+  // Fetch all prints on mount for accurate counts
+  useEffect(() => {
+    fetchAllPrints();
+  }, []);
+
   useEffect(() => {
     fetchPrints();
   }, [filter]);
@@ -188,6 +223,7 @@ export default function Home() {
   const claimPrint = async (printId: string, user: string) => {
     if (USE_MOCK_DATA) {
       setPrints(prev => prev.map(p => p.id === printId ? { ...p, claimed_by: user } : p));
+      setAllPrints(prev => prev.map(p => p.id === printId ? { ...p, claimed_by: user } : p));
       return;
     }
     try {
@@ -196,7 +232,11 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user }),
       });
-      if (res.ok) fetchPrints();
+      if (res.ok) {
+        // Update both prints and allPrints for accurate counts
+        fetchPrints();
+        fetchAllPrints();
+      }
     } catch (error) {
       console.error('Error claiming print:', error);
     }
@@ -205,11 +245,15 @@ export default function Home() {
   const unclaimPrint = async (printId: string) => {
     if (USE_MOCK_DATA) {
       setPrints(prev => prev.map(p => p.id === printId ? { ...p, claimed_by: null } : p));
+      setAllPrints(prev => prev.map(p => p.id === printId ? { ...p, claimed_by: null } : p));
       return;
     }
     try {
       const res = await fetch(`/api/prints/${printId}/unclaim`, { method: 'POST' });
-      if (res.ok) fetchPrints();
+      if (res.ok) {
+        fetchPrints();
+        fetchAllPrints();
+      }
     } catch (error) {
       console.error('Error unclaiming print:', error);
     }
@@ -246,8 +290,7 @@ export default function Home() {
     return coverUrl;
   };
 
-  // Calculate counts from all data (mock or fetched), not filtered data
-  const allPrints = USE_MOCK_DATA ? mockPrints : prints;
+  // Calculate counts from allPrints state (fetched on mount)
   const counts = {
     unclaimed: allPrints.filter(p => !p.claimed_by).length,
     claimed: allPrints.filter(p => p.claimed_by).length,
