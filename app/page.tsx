@@ -221,41 +221,59 @@ export default function Home() {
   }, [filter]);
 
   const claimPrint = async (printId: string, user: string) => {
-    if (USE_MOCK_DATA) {
-      setPrints(prev => prev.map(p => p.id === printId ? { ...p, claimed_by: user } : p));
-      setAllPrints(prev => prev.map(p => p.id === printId ? { ...p, claimed_by: user } : p));
-      return;
-    }
+    // Optimistically update UI immediately
+    const updateClaim = (p: Print) => p.id === printId ? { ...p, claimed_by: user } : p;
+    setPrints(prev => prev.map(updateClaim));
+    setAllPrints(prev => prev.map(updateClaim));
+
+    if (USE_MOCK_DATA) return;
+
     try {
       const res = await fetch(`/api/prints/${printId}/claim`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user }),
       });
-      if (res.ok) {
-        // Update both prints and allPrints for accurate counts
-        fetchPrints();
-        fetchAllPrints();
+      if (!res.ok) {
+        // Revert on failure
+        const revert = (p: Print) => p.id === printId ? { ...p, claimed_by: null } : p;
+        setPrints(prev => prev.map(revert));
+        setAllPrints(prev => prev.map(revert));
       }
     } catch (error) {
       console.error('Error claiming print:', error);
+      // Revert on error
+      const revert = (p: Print) => p.id === printId ? { ...p, claimed_by: null } : p;
+      setPrints(prev => prev.map(revert));
+      setAllPrints(prev => prev.map(revert));
     }
   };
 
   const unclaimPrint = async (printId: string) => {
-    if (USE_MOCK_DATA) {
-      setPrints(prev => prev.map(p => p.id === printId ? { ...p, claimed_by: null } : p));
-      setAllPrints(prev => prev.map(p => p.id === printId ? { ...p, claimed_by: null } : p));
-      return;
-    }
+    // Store previous value for potential revert
+    const previousClaim = prints.find(p => p.id === printId)?.claimed_by;
+
+    // Optimistically update UI immediately
+    const updateUnclaim = (p: Print) => p.id === printId ? { ...p, claimed_by: null } : p;
+    setPrints(prev => prev.map(updateUnclaim));
+    setAllPrints(prev => prev.map(updateUnclaim));
+
+    if (USE_MOCK_DATA) return;
+
     try {
       const res = await fetch(`/api/prints/${printId}/unclaim`, { method: 'POST' });
-      if (res.ok) {
-        fetchPrints();
-        fetchAllPrints();
+      if (!res.ok) {
+        // Revert on failure
+        const revert = (p: Print) => p.id === printId ? { ...p, claimed_by: previousClaim ?? null } : p;
+        setPrints(prev => prev.map(revert));
+        setAllPrints(prev => prev.map(revert));
       }
     } catch (error) {
       console.error('Error unclaiming print:', error);
+      // Revert on error
+      const revert = (p: Print) => p.id === printId ? { ...p, claimed_by: previousClaim ?? null } : p;
+      setPrints(prev => prev.map(revert));
+      setAllPrints(prev => prev.map(revert));
     }
   };
 
