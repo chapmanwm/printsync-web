@@ -102,6 +102,15 @@ export default function Home() {
     }
   };
 
+  const getImageUrl = (coverUrl: string | null) => {
+    if (!coverUrl) return null;
+    // If it's a private S3 URL, use our proxy
+    if (coverUrl.includes('or-cloud-model-prod.s3') && coverUrl.includes('/private/')) {
+      return `/api/image-proxy?url=${encodeURIComponent(coverUrl)}`;
+    }
+    return coverUrl;
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -161,12 +170,14 @@ export default function Home() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {prints.map((print) => (
+            {prints.map((print) => {
+              const imageUrl = getImageUrl(print.cover);
+              return (
               <div key={print.id} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                {print.cover && !brokenImages.has(print.id) ? (
+                {imageUrl && !brokenImages.has(print.id) ? (
                   <div className="relative h-48 bg-gray-100">
                     <Image
-                      src={print.cover}
+                      src={imageUrl}
                       alt={print.title}
                       fill
                       className="object-cover"
@@ -238,7 +249,8 @@ export default function Home() {
                   )}
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
       </div>
